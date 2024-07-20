@@ -4,12 +4,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:progate03/datasource/api_remote_data_source.dart';
 import 'package:progate03/entity/user.dart';
 import 'package:progate03/global.dart';
 import 'package:progate03/repository/login_user_repository.dart';
 import 'package:progate03/widget/landing_page.dart';
+import 'package:progate03/widget/user_detail_dialog.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
-import 'package:url_launcher/url_launcher.dart';
 
 class FriendListPage extends StatefulWidget {
   const FriendListPage({super.key});
@@ -20,20 +21,39 @@ class FriendListPage extends StatefulWidget {
 
 class _FriendListPageState extends State<FriendListPage> {
   late StreamSubscription<AuthState> _authSubscription;
-  File? _newIconFile;
+  File? _selfie;
+  bool isFetchingFriends = true;
+  late List<User> _friends;
+  late LoginUserRepository loginUserRepository;
 
-  setImage(XFile? photo) {
+  setSelfie(XFile? photo) {
     if (photo != null) {
       setState(() {
-        _newIconFile = File(photo.path);
+        _selfie = File(photo.path);
       });
     }
+  }
+
+  Future<void> setFriends() async {
+    setState(() {
+      isFetchingFriends = true;
+    });
+    final friends = await loginUserRepository.friends;
+    setState(() {
+      _friends = friends;
+      isFetchingFriends = false;
+    });
   }
 
   @override
   void initState() {
     super.initState();
 
+    loginUserRepository = DummyLoginUserRepository(
+      supabase: supabase,
+      apiRemoteDataSource: ApiRemoteDataSource(),
+    );
+    setFriends();
     setState(() {
       _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
         final event = data.event;
@@ -63,7 +83,6 @@ class _FriendListPageState extends State<FriendListPage> {
   @override
   Widget build(BuildContext context) {
     // example friend names
-    final loginUserRepository = LoginUserRepository(supabase: supabase);
 
     return Scaffold(
       appBar: AppBar(
@@ -79,103 +98,60 @@ class _FriendListPageState extends State<FriendListPage> {
         ],
         automaticallyImplyLeading: false,
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) => GridView.count(
-          padding: const EdgeInsets.only(top: 8),
-          crossAxisCount: 3,
-          children: loginUserRepository.friends
-              .map((friend) => Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => {
-                          showDialog(
-                            context: context,
-                            builder: (context) =>
-                                UserDetailDialog(user: friend),
-                          )
-                        },
-                        child: CircleAvatar(
-                          radius: constraints.maxWidth / 8,
-                          backgroundImage: Image.network(
-                            friend.iconUrl,
-                            fit: BoxFit.fill,
-                          ).image,
+      body: LayoutBuilder(builder: (context, constraints) {
+        if (isFetchingFriends) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return GridView.count(
+            padding: const EdgeInsets.only(top: 8),
+            crossAxisCount: 3,
+            children: _friends
+                .map((friend) => Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () => {
+                            showDialog(
+                              context: context,
+                              builder: (context) =>
+                                  UserDetailDialog(user: friend),
+                            )
+                          },
+                          child: CircleAvatar(
+                            radius: constraints.maxWidth / 8,
+                            backgroundImage: Image.network(
+                              friend.iconUrl,
+                              fit: BoxFit.fill,
+                            ).image,
+                          ),
                         ),
-                      ),
-                      Text(friend.name,
-                          style: Theme.of(context).textTheme.bodyLarge),
-                    ],
-                  ))
-              .toList(),
-        ),
-      ),
+                        Text(friend.name,
+                            style: Theme.of(context).textTheme.bodyLarge),
+                      ],
+                    ))
+                .toList());
+      }),
       floatingActionButton: Padding(
         padding: const EdgeInsets.all(8.0),
         child: FloatingActionButton(
           onPressed: () async {
             // カメラを起動して写真を撮影
-            final ImagePicker picker = ImagePicker();
-            setImage(await picker.pickImage(source: ImageSource.camera));
+            final picker = ImagePicker();
+            setSelfie(await picker.pickImage(source: ImageSource.camera));
+            if (_selfie == null) return;
+            await loginUserRepository.addFriend(
+                selfie: _selfie!,
+                onSuccess: (newFriendList) async {
+                  if (newFriendList.length == 1) {
+                    showDialog(
+                        context: context,
+                        builder: (context) =>
+                            UserDetailDialog(user: newFriendList.first));
+                  }
+                  await setFriends();
+                });
           },
           child: const FaIcon(FontAwesomeIcons.camera),
-        ),
-      ),
-    );
-  }
-}
-
-class UserDetailDialog extends StatelessWidget {
-  const UserDetailDialog({super.key, required this.user});
-
-  final User user;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) => Dialog(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: CircleAvatar(
-                    radius: constraints.maxWidth / 7,
-                    backgroundImage: Image.network(
-                      user.iconUrl,
-                      fit: BoxFit.fill,
-                    ).image,
-                  )),
-              Text(user.name, style: Theme.of(context).textTheme.headlineSmall),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                for (final snsAccount in user.snsAccounts)
-                  IconButton(
-                    icon: FaIcon(snsAccount.icon),
-                    onPressed: () async {
-                      if (!await launchUrl(snsAccount.uri)) {
-                        debugPrint(
-                            'Could not launch ${snsAccount.uri.toString()}');
-                      }
-                    },
-                  ),
-              ]),
-            ],
-          ),
         ),
       ),
     );

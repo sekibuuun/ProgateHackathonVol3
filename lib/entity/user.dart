@@ -1,6 +1,11 @@
 import 'package:progate03/entity/sns_account.dart';
 
 class User {
+  final String id;
+  final String name;
+  final String iconUrl;
+  final List<SnsAccount> snsAccounts;
+
   const User({
     required this.id,
     required this.name,
@@ -30,8 +35,12 @@ class User {
     );
   }
 
-  final String id;
-  final String name;
-  final String iconUrl;
-  final List<SnsAccount> snsAccounts;
+  factory User.fromJson(user) {
+    return User(
+      id: user['id'],
+      name: user['name'],
+      iconUrl: user['iconUrl'],
+      snsAccounts: user['snsAccounts'],
+    );
+  }
 }

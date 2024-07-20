@@ -5,10 +5,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserRepository {
   final SupabaseClient _supabase;
+  final ApiRemoteDataSource _apiRemoteDataSource;
 
   const UserRepository({
     required SupabaseClient supabase,
-  }) : _supabase = supabase;
+    required ApiRemoteDataSource apiRemoteDataSource,
+  })  : _supabase = supabase,
+        _apiRemoteDataSource = apiRemoteDataSource;
 
   Future<void> createUser(
       {required String username,
@@ -19,7 +22,7 @@ class UserRepository {
     await _supabase.storage.from('test_face_img').upload(filePath, iconImage);
     final iconUrl =
         _supabase.storage.from("test_face_img").getPublicUrl(filePath);
-    await ApiRemoteDataSource().createUser(
+    await _apiRemoteDataSource.createUser(
       id: _supabase.auth.currentUser!.id,
       username: username,
       iconUrl: iconUrl,

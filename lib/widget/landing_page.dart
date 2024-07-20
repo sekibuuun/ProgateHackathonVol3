@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:progate03/datasource/api_remote_data_source.dart';
 import 'package:progate03/global.dart';
 import 'package:progate03/repository/user_repository.dart';
 import 'package:progate03/widget/friend_list_page.dart';
@@ -21,7 +22,10 @@ class _LandingPageState extends State<LandingPage> {
   late StreamSubscription<AuthState> _authSubscription;
   File? _newIconFile;
   String _newUsername = "";
-  final userRepository = UserRepository(supabase: supabase);
+  final userRepository = UserRepository(
+    supabase: supabase,
+    apiRemoteDataSource: ApiRemoteDataSource(),
+  );
 
   setImage(XFile? photo) {
     if (photo != null) {
@@ -100,7 +104,7 @@ class _LandingPageState extends State<LandingPage> {
                   child: GestureDetector(
                       onTap: () async {
                         // カメラを起動して写真を撮影
-                        final ImagePicker picker = ImagePicker();
+                        final picker = ImagePicker();
                         setImage(
                             await picker.pickImage(source: ImageSource.camera));
                       },
