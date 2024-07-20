@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:progate03/entity/user.dart';
 
@@ -142,4 +144,10 @@ class LoginUserRepository {
           iconUrl: 'https://avatars.githubusercontent.com/u/59910028?v=4',
         ),
       ];
+
+  addFriend({
+    required File selfie,
+  }) {
+    // ここで写真をアップロードして、顔認識させる
+  }
 }
