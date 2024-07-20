@@ -36,11 +36,18 @@ class User {
   }
 
   factory User.fromJson(user) {
+    final snsAccounts = <SnsAccount>[];
+    if (user['github_url'] != null) {
+      snsAccounts.add(SnsAccount.github(user['github_url']));
+    }
+    if (user['x_url'] != null) {
+      snsAccounts.add(SnsAccount.x(user['x_url']));
+    }
     return User(
       id: user['id'],
-      name: user['name'],
-      iconUrl: user['iconUrl'],
-      snsAccounts: user['snsAccounts'],
+      name: user['user_name'],
+      iconUrl: user['face_img_uri'],
+      snsAccounts: snsAccounts,
     );
   }
 }

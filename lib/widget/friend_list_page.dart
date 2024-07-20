@@ -49,7 +49,7 @@ class _FriendListPageState extends State<FriendListPage> {
   void initState() {
     super.initState();
 
-    loginUserRepository = DummyLoginUserRepository(
+    loginUserRepository = LoginUserRepository(
       supabase: supabase,
       apiRemoteDataSource: ApiRemoteDataSource(),
     );

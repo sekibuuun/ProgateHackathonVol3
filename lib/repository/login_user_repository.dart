@@ -14,7 +14,11 @@ class LoginUserRepository {
   })  : _supabase = supabase,
         _apiRemoteDataSource = apiRemoteDataSource;
 
-  Future<List<User>> get friends async => [];
+  Future<List<User>> get friends async {
+    return await _apiRemoteDataSource.getFriends(
+      id: _supabase.auth.currentUser!.id,
+    );
+  }
 
   // 写真をアップロードして、認識したユーザーを返す
   Future<void> addFriend({

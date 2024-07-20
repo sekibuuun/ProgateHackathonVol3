@@ -35,7 +35,7 @@ class ApiRemoteDataSource {
   }) async {
     final request = http.MultipartRequest(
       'POST',
-      _uri("/detect_face/$id"),
+      _uri("/detect_faces/$id"),
     );
     request.files.add(http.MultipartFile.fromBytes(
       'file',
@@ -55,5 +55,19 @@ class ApiRemoteDataSource {
           .map<User>((user) => User.fromJson(user))
           .toList();
     });
+  }
+
+  Future<List<User>> getFriends({
+    required String id,
+  }) async {
+    final response = await http.get(_uri("/friends/$id"));
+    print(response.statusCode);
+    if (response.statusCode != 200) {
+      return [];
+    }
+    return json.decode(response.body).map<User>((user) {
+      print(user);
+      return User.fromJson(user);
+    }).toList();
   }
 }
