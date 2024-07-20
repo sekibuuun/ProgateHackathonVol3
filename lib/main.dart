@@ -1,20 +1,23 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:progate03/entity/user.dart';
 import 'package:progate03/repository/login_user_repository.dart';
+import 'package:progate03/repository/user_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await dotenv.load(fileName: ".env");
   await Supabase.initialize(
-    url: 'https://fkmcbcubjjureqksfdle.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrbWNiY3Viamp1cmVxa3NmZGxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjEzMDY2ODksImV4cCI6MjAzNjg4MjY4OX0.fLhHORze2zXx6Rj9MilXGZ80wodz-PaIuiNzJaQEJZw',
-  );
+      url: dotenv.env['SUPABASE_URL']!,
+      anonKey: dotenv.env['SUPABASE_ANON_KEY']!);
   runApp(const MyApp());
 }
 
@@ -31,25 +34,38 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.grey),
         useMaterial3: true,
       ),
-      home: const MyHomePage(),
+      home: supabase.auth.currentUser != null
+          ? const FriendListPage()
+          : const LandingPage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+class LandingPage extends StatefulWidget {
+  const LandingPage({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<LandingPage> createState() => _LandingPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  String _loginState = 'Not logged in';
-  StreamSubscription<AuthState>? _authSubscription;
+class _LandingPageState extends State<LandingPage> {
+  bool _didPressedCreateAccount = false;
+  late StreamSubscription<AuthState> _authSubscription;
+  File? _newIconFile;
+  String _newUsername = "";
+  final userRepository = UserRepository(supabase: supabase);
 
-  _changeLoginState(bool hasLoggedIn) {
+  setImage(XFile? photo) {
+    if (photo != null) {
+      setState(() {
+        _newIconFile = File(photo.path);
+      });
+    }
+  }
+
+  setUsername(String username) {
     setState(() {
-      _loginState = hasLoggedIn ? 'Logged in' : 'Not logged in';
+      _newUsername = username;
     });
   }
 
@@ -58,20 +74,34 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
 
     setState(() {
-      _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+      _authSubscription = supabase.auth.onAuthStateChange.listen((data) async {
         final event = data.event;
+        final session = data.session;
 
         switch (event) {
           case AuthChangeEvent.signedIn:
-            _changeLoginState(true);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const FriendListPage()),
-            );
-            break;
-
-          case AuthChangeEvent.signedOut:
-            _changeLoginState(false);
+            {
+              if (_didPressedCreateAccount) {
+                await userRepository.createUser(
+                    username: _newUsername,
+                    iconImage: _newIconFile!,
+                    onSuccess: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) {
+                          return const FriendListPage();
+                        }),
+                      );
+                    });
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) {
+                    return const FriendListPage();
+                  }),
+                );
+              }
+            }
             break;
 
           default:
@@ -85,53 +115,129 @@ class _MyHomePageState extends State<MyHomePage> {
   void dispose() {
     super.dispose();
 
-    if (_authSubscription != null) {
-      _authSubscription!.cancel();
-    }
+    _authSubscription.cancel();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text("Home"),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text('Login state: $_loginState'),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await supabase.auth.signInWithOAuth(
-                    OAuthProvider.github,
-                    redirectTo: "io.supabase.oauth://login-callback/",
-                  );
-                } on AuthException catch (error) {
-                  debugPrint(error.toString());
-                } catch (error) {
-                  debugPrint(error.toString());
-                }
-              },
-              child: const Text('Sign in with Github'),
+      body: LayoutBuilder(
+        builder: (context, constraints) => Center(
+          child: SizedBox(
+            width: constraints.maxWidth / 1.5,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: GestureDetector(
+                      onTap: () async {
+                        // カメラを起動して写真を撮影
+                        final ImagePicker picker = ImagePicker();
+                        // ファイルを扱う処理は省略・・・
+                        setImage(
+                            await picker.pickImage(source: ImageSource.camera));
+                      },
+                      child: CircleAvatar(
+                        radius: constraints.maxWidth / 8,
+                        backgroundImage: _newIconFile != null
+                            ? FileImage(_newIconFile!)
+                            : null,
+                        child: _newIconFile == null
+                            ? const FaIcon(FontAwesomeIcons.camera)
+                            : null,
+                      )),
+                ),
+                TextField(
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Username',
+                  ),
+                  onChanged: setUsername,
+                ),
+                ElevatedButton(
+                  onPressed: _newIconFile != null && _newUsername.isNotEmpty
+                      ? () async {
+                          setState(() {
+                            _didPressedCreateAccount = true;
+                          });
+                          await supabase.auth.signInWithOAuth(
+                            OAuthProvider.github,
+                            redirectTo: "io.supabase.oauth://login-callback/",
+                          );
+                        }
+                      : null,
+                  child: const Text('Create Account with GitHub'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child:
+                      Text('or', style: Theme.of(context).textTheme.bodyMedium),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await supabase.auth.signInWithOAuth(
+                        OAuthProvider.github,
+                        redirectTo: "io.supabase.oauth://login-callback/",
+                      );
+                    } on AuthException catch (error) {
+                      debugPrint(error.toString());
+                    } catch (error) {
+                      debugPrint(error.toString());
+                    }
+                  },
+                  child: const Text('Sign in with GitHub'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () async {
-                await supabase.auth.signOut();
-              },
-              child: const Text('Sign out'),
-            )
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class FriendListPage extends StatelessWidget {
+class FriendListPage extends StatefulWidget {
   const FriendListPage({super.key});
+
+  @override
+  State<FriendListPage> createState() => _FriendListPageState();
+}
+
+class _FriendListPageState extends State<FriendListPage> {
+  late StreamSubscription<AuthState> _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+
+    setState(() {
+      _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+        final event = data.event;
+        final session = data.session;
+
+        switch (event) {
+          case AuthChangeEvent.signedOut:
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LandingPage()),
+            );
+            break;
+
+          default:
+            break;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+
+    _authSubscription.cancel();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,6 +248,14 @@ class FriendListPage extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
           title: const Text('Friend List'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () async {
+                await supabase.auth.signOut();
+              },
+            ),
+          ],
           automaticallyImplyLeading: false,
         ),
         body: LayoutBuilder(
@@ -161,13 +275,10 @@ class FriendListPage extends StatelessWidget {
                           },
                           child: CircleAvatar(
                             radius: constraints.maxWidth / 8,
-                            child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                    constraints.maxWidth / 8),
-                                child: Image.network(
-                                  friend.iconUrl,
-                                  fit: BoxFit.fill,
-                                )),
+                            backgroundImage: Image.network(
+                              friend.iconUrl,
+                              fit: BoxFit.fill,
+                            ).image,
                           ),
                         ),
                         Text(friend.name,
@@ -212,13 +323,10 @@ class UserDetailDialog extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: CircleAvatar(
                     radius: constraints.maxWidth / 7,
-                    child: ClipRRect(
-                        borderRadius:
-                            BorderRadius.circular(constraints.maxWidth / 7),
-                        child: Image.network(
-                          user.iconUrl,
-                          fit: BoxFit.fill,
-                        )),
+                    backgroundImage: Image.network(
+                      user.iconUrl,
+                      fit: BoxFit.fill,
+                    ).image,
                   )),
               Text(user.name, style: Theme.of(context).textTheme.headlineSmall),
               Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -233,6 +341,35 @@ class UserDetailDialog extends StatelessWidget {
                     },
                   ),
               ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class CreateAccountPage extends StatelessWidget {
+  const CreateAccountPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('Create Account'),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              ElevatedButton(
+                onPressed: () async {
+                  await supabase.auth.signOut();
+                },
+                child: const Text('Sign out'),
+              ),
             ],
           ),
         ),

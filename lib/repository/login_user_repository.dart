@@ -2,11 +2,13 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:progate03/entity/user.dart';
 
 class LoginUserRepository {
-  const LoginUserRepository({required this.supabase});
+  final SupabaseClient _supabase;
 
-  final SupabaseClient supabase;
+  const LoginUserRepository({required SupabaseClient supabase})
+      : _supabase = supabase;
 
   List<User> get friends => [
+        // this data is dummy!!!!
         User.dummy(
           id: '1',
           name: 'Alice',
