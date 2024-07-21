@@ -34,14 +34,24 @@ class _FriendListPageState extends State<FriendListPage> {
     }
   }
 
-  Future<void> setFriends() async {
+  showProgress() {
     setState(() {
       isFetchingFriends = true;
     });
+  }
+
+  hideProgress() {
+    setState(() {
+      isFetchingFriends = false;
+    });
+  }
+
+  Future<void> setFriends() async {
+    showProgress();
     final friends = await loginUserRepository.friends;
+    hideProgress();
     setState(() {
       _friends = friends;
-      isFetchingFriends = false;
     });
   }
 
@@ -49,7 +59,7 @@ class _FriendListPageState extends State<FriendListPage> {
   void initState() {
     super.initState();
 
-    loginUserRepository = LoginUserRepository(
+    loginUserRepository = DummyLoginUserRepository(
       supabase: supabase,
       apiRemoteDataSource: ApiRemoteDataSource(),
     );
@@ -103,6 +113,10 @@ class _FriendListPageState extends State<FriendListPage> {
           return const Center(child: CircularProgressIndicator());
         }
 
+        if (_friends.isEmpty) {
+          return const Center(child: Text('No friends yet'));
+        }
+
         return GridView.count(
             padding: const EdgeInsets.only(top: 8),
             crossAxisCount: 3,
@@ -139,6 +153,8 @@ class _FriendListPageState extends State<FriendListPage> {
             final picker = ImagePicker();
             setSelfie(await picker.pickImage(source: ImageSource.camera));
             if (_selfie == null) return;
+
+            showProgress();
             await loginUserRepository.addFriend(
                 selfie: _selfie!,
                 onSuccess: (newFriendList) async {
@@ -150,6 +166,7 @@ class _FriendListPageState extends State<FriendListPage> {
                   }
                   await setFriends();
                 });
+            hideProgress();
           },
           child: const FaIcon(FontAwesomeIcons.camera),
         ),

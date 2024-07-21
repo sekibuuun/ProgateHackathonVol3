@@ -187,7 +187,7 @@ class DummyLoginUserRepository extends LoginUserRepository {
     void Function(List<User>)? onSuccess,
   }) async {
     final newFriendList = await Future.delayed(
-      const Duration(seconds: 1),
+      const Duration(seconds: 5),
       () => [
         User.dummy(
           id: '27',
