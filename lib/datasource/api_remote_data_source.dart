@@ -10,10 +10,35 @@ class ApiRemoteDataSource {
     return Uri.parse("${dotenv.env['API_URL']!}$endpoint");
   }
 
+  Future<User> getUser({required String id}) async {
+    final response = await http.get(_uri("/users/$id"));
+    if (response.statusCode != 200) {
+      return Future.error(json.decode(response.body)['detail']);
+    }
+    return User.fromJson(json.decode(response.body)[0]);
+  }
+
+  Future<void> updateUser(User user) async {
+    http.patch(
+      _uri("/users/${user.id}"),
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: json.encode({
+        'user_name': user.name,
+        'github_url': user.github?.uri.toString() ?? "",
+        'x_url': user.x?.uri.toString() ?? "",
+        'face_img_uri': user.iconUrl,
+      }),
+    );
+  }
+
   Future<void> createUser({
     required String id,
     required String username,
     required String iconUrl,
+    String? githubUrl,
+    String? xUrl,
   }) async {
     http.patch(
       _uri("/users/$id"),
@@ -22,8 +47,8 @@ class ApiRemoteDataSource {
       },
       body: json.encode({
         'user_name': username,
-        'github_url': 'example.com',
-        'x_url': 'example.com',
+        'github_url': githubUrl ?? "",
+        'x_url': xUrl ?? "",
         'face_img_uri': iconUrl,
       }),
     );

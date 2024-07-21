@@ -10,7 +10,9 @@ import 'package:progate03/global.dart';
 import 'package:progate03/repository/login_user_repository.dart';
 import 'package:progate03/repository/selfie_repository.dart';
 import 'package:progate03/widget/landing_page.dart';
+import 'package:progate03/widget/user_detail.dart';
 import 'package:progate03/widget/user_detail_dialog.dart';
+import 'package:progate03/widget/user_editable_profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 class FriendListPage extends StatefulWidget {
@@ -23,7 +25,7 @@ class FriendListPage extends StatefulWidget {
 class _FriendListPageState extends State<FriendListPage> {
   late StreamSubscription<AuthState> _authSubscription;
   File? _selfie;
-  bool isFetchingFriends = true;
+  bool _isProgressVisible = true;
   late List<User> _friends;
   late LoginUserRepository loginUserRepository;
   final selfieRepository = SelfieRepository();
@@ -38,34 +40,34 @@ class _FriendListPageState extends State<FriendListPage> {
 
   showProgress() {
     setState(() {
-      isFetchingFriends = true;
+      _isProgressVisible = true;
     });
   }
 
   hideProgress() {
     setState(() {
-      isFetchingFriends = false;
+      _isProgressVisible = false;
     });
   }
 
-  Future<void> setFriends() async {
+  Future<void> setFriend() async {
     showProgress();
     final friends = await loginUserRepository.friends;
-    hideProgress();
     setState(() {
       _friends = friends;
     });
+    hideProgress();
   }
 
   @override
   void initState() {
     super.initState();
 
-    loginUserRepository = DummyLoginUserRepository(
+    loginUserRepository = LoginUserRepository(
       supabase: supabase,
       apiRemoteDataSource: ApiRemoteDataSource(),
     );
-    setFriends();
+    setFriend();
     setState(() {
       _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
         final event = data.event;
@@ -109,41 +111,52 @@ class _FriendListPageState extends State<FriendListPage> {
         automaticallyImplyLeading: false,
       ),
       body: LayoutBuilder(builder: (context, constraints) {
-        if (isFetchingFriends) {
+        if (_isProgressVisible) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (_friends.isEmpty) {
-          return const Center(child: Text('No friends yet'));
-        }
-
-        return GridView.count(
-            padding: const EdgeInsets.only(top: 8),
-            crossAxisCount: 3,
-            children: _friends
-                .map((friend) => Column(
-                      children: [
-                        GestureDetector(
-                          onTap: () => {
-                            showDialog(
-                              context: context,
-                              builder: (context) =>
-                                  UserDetailDialog(user: friend),
-                            )
-                          },
-                          child: CircleAvatar(
-                            radius: constraints.maxWidth / 8,
-                            backgroundImage: Image.network(
-                              friend.iconUrl,
-                              fit: BoxFit.fill,
-                            ).image,
-                          ),
-                        ),
-                        Text(friend.name,
-                            style: Theme.of(context).textTheme.bodyLarge),
-                      ],
-                    ))
-                .toList());
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child:
+                  UserEditableProfile(loginUserRepository: loginUserRepository),
+            ),
+            Expanded(
+              child: _friends.isEmpty
+                  ? const Center(child: Text('No friends yet'))
+                  : GridView.count(
+                      padding: const EdgeInsets.only(top: 8),
+                      crossAxisCount: 3,
+                      children: _friends
+                          .map((friend) => Column(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) =>
+                                            UserDetailDialog(user: friend),
+                                      )
+                                    },
+                                    child: CircleAvatar(
+                                      radius: constraints.maxWidth / 8,
+                                      backgroundImage: Image.network(
+                                        friend.iconUrl,
+                                        fit: BoxFit.fill,
+                                      ).image,
+                                    ),
+                                  ),
+                                  Text(friend.name,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge),
+                                ],
+                              ))
+                          .toList()),
+            ),
+          ],
+        );
       }),
       floatingActionButton: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -167,7 +180,7 @@ class _FriendListPageState extends State<FriendListPage> {
                           UserDetailDialog(user: newFriendList.first));
                 }
                 await selfieRepository.saveSelfie(_selfie!);
-                await setFriends();
+                await setFriend();
               },
             ).catchError((e) {
               hideProgress();

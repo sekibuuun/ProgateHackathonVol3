@@ -4,16 +4,20 @@ class User {
   final String id;
   final String name;
   final String iconUrl;
+  final SnsAccount? x;
+  final SnsAccount? github;
   final List<SnsAccount> snsAccounts;
 
   const User({
     required this.id,
     required this.name,
     required this.iconUrl,
+    this.x,
+    this.github,
     this.snsAccounts = const [],
   });
 
-  factory User.dummy({
+  factory User.of({
     String id = '1',
     String name = 'Alice',
     String iconUrl = 'https://randomuser.me/api/portraits',
@@ -21,33 +25,32 @@ class User {
     String? xUrl,
   }) {
     final snsAccounts = <SnsAccount>[];
-    if (githubUrl != null) {
-      snsAccounts.add(SnsAccount.github(githubUrl));
+    final github = githubUrl != null ? SnsAccount.github(githubUrl) : null;
+    final x = xUrl != null ? SnsAccount.x(xUrl) : null;
+
+    if (github != null) {
+      snsAccounts.add(github);
     }
-    if (xUrl != null) {
-      snsAccounts.add(SnsAccount.x(xUrl));
+    if (x != null) {
+      snsAccounts.add(x);
     }
     return User(
       id: id,
       name: name,
       iconUrl: iconUrl,
+      x: x,
+      github: github,
       snsAccounts: snsAccounts,
     );
   }
 
   factory User.fromJson(user) {
-    final snsAccounts = <SnsAccount>[];
-    if (user['github_url'] != null) {
-      snsAccounts.add(SnsAccount.github(user['github_url']));
-    }
-    if (user['x_url'] != null) {
-      snsAccounts.add(SnsAccount.x(user['x_url']));
-    }
-    return User(
+    return User.of(
       id: user['id'],
       name: user['user_name'],
       iconUrl: user['face_img_uri'],
-      snsAccounts: snsAccounts,
+      githubUrl: user['github_url'],
+      xUrl: user['x_url'],
     );
   }
 }
