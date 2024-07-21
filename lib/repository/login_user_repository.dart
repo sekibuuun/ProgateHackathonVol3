@@ -21,15 +21,14 @@ class LoginUserRepository {
   }
 
   // 写真をアップロードして、認識したユーザーを返す
-  Future<void> addFriend({
+  Future<List<User>> addFriend({
     required File selfie,
-    Future<void> Function(List<User>)? onSuccess,
   }) async {
     final newFriendList = await _apiRemoteDataSource.uploadSelfie(
       id: _supabase.auth.currentUser!.id,
       selfie: selfie,
     );
-    await onSuccess?.call(newFriendList);
+    return newFriendList;
   }
 }
 
@@ -182,12 +181,11 @@ class DummyLoginUserRepository extends LoginUserRepository {
       );
 
   @override
-  Future<void> addFriend({
+  Future<List<User>> addFriend({
     required File selfie,
-    void Function(List<User>)? onSuccess,
   }) async {
     final newFriendList = await Future.delayed(
-      const Duration(seconds: 5),
+      const Duration(seconds: 1),
       () => [
         User.dummy(
           id: '27',
@@ -197,9 +195,10 @@ class DummyLoginUserRepository extends LoginUserRepository {
           xUrl: 'https://x.com/',
         ),
       ],
+      // () => Future.error('Faces has not been detected. Try again.'),
     );
     _friends.addAll(newFriendList);
 
-    onSuccess?.call(newFriendList);
+    return newFriendList;
   }
 }

@@ -47,7 +47,7 @@ class ApiRemoteDataSource {
 
     return http.Response.fromStream(stream).then((response) {
       if (response.statusCode != 200) {
-        return Future.error('Faces has not been detected. Try again.');
+        return Future.error(json.decode(response.body)['detail']);
       }
 
       return json

@@ -8,6 +8,7 @@ import 'package:progate03/datasource/api_remote_data_source.dart';
 import 'package:progate03/entity/user.dart';
 import 'package:progate03/global.dart';
 import 'package:progate03/repository/login_user_repository.dart';
+import 'package:progate03/repository/selfie_repository.dart';
 import 'package:progate03/widget/landing_page.dart';
 import 'package:progate03/widget/user_detail_dialog.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
@@ -25,6 +26,7 @@ class _FriendListPageState extends State<FriendListPage> {
   bool isFetchingFriends = true;
   late List<User> _friends;
   late LoginUserRepository loginUserRepository;
+  final selfieRepository = SelfieRepository();
 
   setSelfie(XFile? photo) {
     if (photo != null) {
@@ -92,8 +94,6 @@ class _FriendListPageState extends State<FriendListPage> {
 
   @override
   Widget build(BuildContext context) {
-    // example friend names
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -149,24 +149,32 @@ class _FriendListPageState extends State<FriendListPage> {
         padding: const EdgeInsets.all(8.0),
         child: FloatingActionButton(
           onPressed: () async {
-            // カメラを起動して写真を撮影
             final picker = ImagePicker();
-            setSelfie(await picker.pickImage(source: ImageSource.camera));
+            setSelfie(await picker.pickImage(
+                source: ImageSource.camera, imageQuality: 50));
+
             if (_selfie == null) return;
 
             showProgress();
-            await loginUserRepository.addFriend(
-                selfie: _selfie!,
-                onSuccess: (newFriendList) async {
-                  if (newFriendList.length == 1) {
-                    showDialog(
-                        context: context,
-                        builder: (context) =>
-                            UserDetailDialog(user: newFriendList.first));
-                  }
-                  await setFriends();
-                });
-            hideProgress();
+
+            await loginUserRepository.addFriend(selfie: _selfie!).then(
+              (newFriendList) async {
+                hideProgress();
+                if (newFriendList.length == 1) {
+                  showDialog(
+                      context: context,
+                      builder: (context) =>
+                          UserDetailDialog(user: newFriendList.first));
+                }
+                await selfieRepository.saveSelfie(_selfie!);
+                await setFriends();
+              },
+            ).catchError((e) {
+              hideProgress();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(e),
+              ));
+            });
           },
           child: const FaIcon(FontAwesomeIcons.camera),
         ),
